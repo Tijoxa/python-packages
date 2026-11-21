@@ -21,7 +21,7 @@ mosecapy = { index = "tijoxa" }
 
 To install `snowpark-rs[session]`, include both Snowpark source entries and list `snowpark-rs-session` as a direct dependency in `project.dependencies`. This lets uv apply its source entry when resolving the extra from the explicit index.
 
-The Snowpark release workflow builds wheels for Windows and Linux x86-64, and for Intel and Apple Silicon macOS. Snowpark and Polars Cactus require CPython 3.13 or newer. Polars Cactus is available here for Windows x86-64. Mosecapy is a pure Python wheel that requires Python 3.9. Use a separate project or environment for Mosecapy.
+The Snowpark release workflow builds wheels for Windows and Linux x86-64 and for Apple Silicon macOS. Snowpark and Polars Cactus require CPython 3.13 or newer. Polars Cactus is available here for Windows x86-64. Mosecapy is a pure Python wheel that requires Python 3.9. Use a separate project or environment for Mosecapy.
 
 ## Publish a wheel
 
