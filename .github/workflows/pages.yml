@@ -28,7 +28,7 @@ jobs:
         run: |
           mkdir _site
           cp -R simple index.html _site/
-          python .github/scripts/index_snowpark.py _site/simple
+          python .github/scripts/index_releases.py _site/simple
         env:
           GH_TOKEN: ${{ github.token }}
       - uses: actions/upload-pages-artifact@v5

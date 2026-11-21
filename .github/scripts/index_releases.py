@@ -1,4 +1,4 @@
-"""Index public Snowpark Release assets on the static Simple API pages."""
+"""Index public GitHub Release assets on the static Simple API pages."""
 
 import json
 import re
@@ -10,8 +10,10 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 
-REPOSITORY = "Tijoxa/snowpark-rs"
-PROJECTS = ("snowpark-rs", "snowpark-rs-session")
+RELEASE_PROJECTS = {
+    "Tijoxa/snowpark-rs": ("snowpark-rs", "snowpark-rs-session"),
+    "Tijoxa/denki-client": ("denki-client",),
+}
 SHA256 = re.compile(r"sha256:([a-f0-9]{64})")
 
 
@@ -30,15 +32,15 @@ class WheelLinks(HTMLParser):
             self.links[filename] = (href, attributes.get("data-requires-python") or "")
 
 
-def public_releases() -> list[dict]:
+def public_releases(repository: str) -> list[dict]:
     response = subprocess.check_output(
-        ["gh", "api", "--paginate", "--slurp", f"repos/{REPOSITORY}/releases?per_page=100"],
+        ["gh", "api", "--paginate", "--slurp", f"repos/{repository}/releases?per_page=100"],
         encoding="utf-8",
     )
     return [release for page in json.loads(response) for release in page if not release["draft"]]
 
 
-def release_wheels(release: dict) -> tuple[str, dict[str, tuple[str, str]]] | None:
+def release_wheels(release: dict, projects: tuple[str, ...]) -> tuple[str, dict[str, tuple[str, str]]] | None:
     assets = {asset["name"]: asset for asset in release["assets"] if asset["state"] == "uploaded"}
     manifest = assets.get("wheel-index.json")
     if manifest is None:
@@ -48,7 +50,7 @@ def release_wheels(release: dict) -> tuple[str, dict[str, tuple[str, str]]] | No
         info = json.load(response)
 
     name, version = info["name"], info["version"]
-    if name not in PROJECTS or release["tag_name"] != f"{name}-v{version}":
+    if name not in projects or release["tag_name"] != f"{name}-v{version}":
         raise ValueError(f"Unexpected wheel manifest in {release['tag_name']}")
 
     prefix = f"{name.replace('-', '_')}-{version}-"
@@ -67,8 +69,7 @@ def release_wheels(release: dict) -> tuple[str, dict[str, tuple[str, str]]] | No
 
 def format_page(name: str, links: dict[str, tuple[str, str]]) -> str:
     anchors = "\n".join(
-        f'    <a href="{escape(href)}" data-requires-python="{escape(requires_python)}">'
-        f"{escape(filename)}</a>"
+        f'    <a href="{escape(href)}" data-requires-python="{escape(requires_python)}">{escape(filename)}</a>'
         for filename, (href, requires_python) in sorted(links.items())
     )
     return f"""<!doctype html>
@@ -86,22 +87,23 @@ def format_page(name: str, links: dict[str, tuple[str, str]]) -> str:
 
 
 def build_index(simple: Path) -> None:
-    links_by_project = {}
-    for name in PROJECTS:
-        index = simple / name / "index.html"
-        links = WheelLinks()
-        links.feed(index.read_text(encoding="utf-8"))
-        links_by_project[name] = links.links
+    for repository, projects in RELEASE_PROJECTS.items():
+        links_by_project = {}
+        for name in projects:
+            index = simple / name / "index.html"
+            links = WheelLinks()
+            links.feed(index.read_text(encoding="utf-8"))
+            links_by_project[name] = links.links
 
-    for release in public_releases():
-        public = release_wheels(release)
-        if public is not None:
-            name, links = public
-            links_by_project[name].update(links)
+        for release in public_releases(repository):
+            public = release_wheels(release, projects)
+            if public is not None:
+                name, links = public
+                links_by_project[name].update(links)
 
-    for name, links in links_by_project.items():
-        (simple / name / "index.html").write_text(format_page(name, links), encoding="utf-8")
-        print(f"Indexed {len(links)} wheels for {name}")
+        for name, links in links_by_project.items():
+            (simple / name / "index.html").write_text(format_page(name, links), encoding="utf-8")
+            print(f"Indexed {len(links)} wheels for {name}")
 
 
 if __name__ == "__main__":
